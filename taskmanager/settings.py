@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django_rest_passwordreset',
     'rest_framework',
     'taskmanager_api.apps.TaskmanagerApiConfig',
+    'whitenoise.runserver_nostatic',
 ]
 
 MIDDLEWARE = [
@@ -49,6 +50,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
 ]
 
 ROOT_URLCONF = 'taskmanager.urls'
@@ -88,7 +90,7 @@ DATABASES = {
         'USER': 'tgjidnapphdupv',
         'PASSWORD': 'a6a5366491c361ec9bae9f6d2605a756e638881a09565b126c2b1b453daea5cd',
         'HOST': 'ec2-3-222-127-167.compute-1.amazonaws.com',
-        'PORT': '5432',
+        'PORT': 5432,
     }
 }
 
@@ -126,6 +128,7 @@ USE_TZ = True
 
 AUTH_USER_MODEL = 'taskmanager_api.User'
 
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 STATIC_URL = '/static/'
 

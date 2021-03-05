@@ -121,7 +121,7 @@ class SendUserActivationEmail(APIView):
 
 class ChangePasswordView(UpdateAPIView):
     """
-    An endpoint for changing password.
+    Call to change password.
     """
     serializer_class = ChangePasswordSerializer
     model = User
