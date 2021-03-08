@@ -27,6 +27,7 @@ ALLOWED_HOSTS = ['taskmanager--1.herokuapp.com', '0.0.0.0', 'localhost', '127.0.
 # Application definition
 
 INSTALLED_APPS = [
+    'core.apps.CoreConfig',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -86,11 +87,11 @@ WSGI_APPLICATION = 'taskmanager.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': 'd8pkhm786gjq0n',
-        'USER': 'tgjidnapphdupv',
-        'PASSWORD': 'a6a5366491c361ec9bae9f6d2605a756e638881a09565b126c2b1b453daea5cd',
-        'HOST': 'ec2-3-222-127-167.compute-1.amazonaws.com',
-        'PORT': 5432,
+        'NAME': env('DATABASE_NAME'),
+        'USER': env('DATABASE_USER'),
+        'PASSWORD': env('DATABASE_PASSWORD'),
+        'HOST': env('DATABASE_HOST'),
+        'PORT': env('DATABASE_PORT'),
     }
 }
 
@@ -126,7 +127,7 @@ USE_L10N = True
 
 USE_TZ = True
 
-AUTH_USER_MODEL = 'taskmanager_api.User'
+AUTH_USER_MODEL = 'core.User'
 
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")

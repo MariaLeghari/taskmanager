@@ -24,4 +24,5 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('swagger/', schema_view.with_ui(cache_timeout=0), name='schema-json'),
     path('api/', include('taskmanager_api.urls')),
+    path('api/users/', include('core.urls')),
 ]
