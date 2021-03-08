@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'drf_yasg',
     'django_rest_passwordreset',
     'rest_framework',
+    'rest_framework.authtoken',
     'taskmanager_api.apps.TaskmanagerApiConfig',
     'whitenoise.runserver_nostatic',
 ]

@@ -2,6 +2,7 @@
 Task Manager API URL Configuration
 """
 from django.urls import include, path
+from rest_framework.authtoken.views import obtain_auth_token
 
 from core.views import (
     ActivateAccount,
@@ -20,4 +21,5 @@ urlpatterns = [
     path('activate/<uidb64>/<token>', ActivateAccount.as_view(), name='activate_user'),
     path('send_activation_email/', SendUserActivationEmail.as_view(), name='send_activation_email'),
     path('password_reset/', include('django_rest_passwordreset.urls', namespace='password_reset')),
+    path('obtain-token/', obtain_auth_token, name='login'),
 ]

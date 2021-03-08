@@ -1,12 +1,8 @@
 """
 Task Manager Views
 """
-from django.core.mail import send_mail
 from django.db.models import Q
-from django.dispatch import receiver
-from django.urls import reverse
 from django_filters.rest_framework import DjangoFilterBackend
-from django_rest_passwordreset.signals import reset_password_token_created
 from rest_framework.views import APIView
 from rest_framework.generics import ListCreateAPIView
 from rest_framework.permissions import IsAuthenticated
@@ -14,6 +10,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 from rest_framework import status
 
+from core.models import User
 from taskmanager_api.models import Comment, EventLog, Task, RejectedTask
 from taskmanager_api.serializers import (
     CommentSerializer,
