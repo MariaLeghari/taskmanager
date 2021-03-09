@@ -5,6 +5,7 @@ from rest_framework import serializers
 from rest_framework.serializers import raise_errors_on_nested_writes
 from rest_framework.utils import model_meta
 
+from core.utils import STATUS_CHOICES
 from taskmanager_api.models import Comment, EventLog, RejectedTask, Task
 
 
@@ -54,7 +55,7 @@ class TaskSerializer(serializers.ModelSerializer):
                 setattr(instance, attr, value)
 
         if new_assignee and new_assignee != old_assignee:
-            instance.pending_task()
+            instance.change_task_status(STATUS_CHOICES.PENDING)
 
         instance.save()
 
@@ -69,7 +70,7 @@ class RejectedTaskSerializer(serializers.ModelSerializer):
     """
     Serializer for rejected task
     """
-    assignee = serializers.Field(default=serializers.CurrentUserDefault(), required=False)
+    assignee = serializers.HiddenField(default=serializers.CurrentUserDefault(), required=False)
 
     class Meta:
         model = RejectedTask

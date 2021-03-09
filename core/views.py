@@ -3,7 +3,6 @@ Task Manager Core Views
 """
 from django.utils.encoding import force_text
 from django.utils.http import urlsafe_base64_decode
-from requests import Response
 from rest_framework import status
 from rest_framework.generics import (
     CreateAPIView,
@@ -12,6 +11,7 @@ from rest_framework.generics import (
     UpdateAPIView
 )
 from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
+from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.models import User
@@ -22,6 +22,7 @@ from core.serializers import (
     UserUpdateSerializer
 )
 from core.tokens import AccountActivationTokenGenerator
+from core.utils import send_activation_email
 
 
 class UserList(ListAPIView):
@@ -61,7 +62,7 @@ class UserCreateView(CreateAPIView):
         if serializer.is_valid():
             user = serializer.save()
             if user:
-                user.send_activation_email(request)
+                send_activation_email(user, request)
                 return Response({'data': 'send email'}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -79,17 +80,16 @@ class ActivateAccount(APIView):
         if user:
             if not user.is_active:
                 if AccountActivationTokenGenerator().check_token(user, token):
-                    user.is_activation_token_used = True
                     user.is_active = True
                     user.save()
                     return Response({'data': 'account is activated.'}, status=status.HTTP_200_OK)
                 else:
                     return Response({'error': 'token already used or expired!'}, status=status.HTTP_406_NOT_ACCEPTABLE)
             else:
-                return Response({'data': 'account is already activated.'}, status.HTTP_401_UNAUTHORIZED)
+                return Response({'data': 'account is already activated.'}, status=status.HTTP_401_UNAUTHORIZED)
 
         else:
-            return Response({'error': 'user does not exist.'}, status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'user does not exist.'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class SendUserActivationEmail(APIView):
@@ -106,12 +106,12 @@ class SendUserActivationEmail(APIView):
         user = User.objects.filter(email=email).first()
         if user:
             if not user.is_active:
-                user.send_activation_email(request)
+                send_activation_email(user, request)
                 return Response({'data': 'send email'}, status=status.HTTP_200_OK)
             else:
                 return Response({'data': 'already activated'}, status=status.HTTP_401_UNAUTHORIZED)
         else:
-            return Response({'error': 'user does not exist'}, status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'user does not exist'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class ChangePasswordView(UpdateAPIView):
@@ -134,7 +134,6 @@ class ChangePasswordView(UpdateAPIView):
             # Check old password
             if not self.object.check_password(serializer.data.get("old_password")):
                 return Response({"old_password": ["Wrong password."]}, status=status.HTTP_400_BAD_REQUEST)
-            # set_password also hashes the password that the user will get
             self.object.set_password(serializer.data.get("new_password"))
             self.object.save()
             response = {
@@ -144,7 +143,6 @@ class ChangePasswordView(UpdateAPIView):
                 'data': []
             }
 
-            return Response(response)
+            return Response(response, status=status.HTTP_200_OK)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-

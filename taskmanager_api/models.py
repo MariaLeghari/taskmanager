@@ -3,12 +3,10 @@ Task Manager Models
 """
 from django.contrib.auth.models import AbstractUser
 from django.db import models
-from model_utils import Choices
 from model_utils.models import TimeStampedModel
 
 from core.models import User
-
-STATUS_CHOICES = Choices('PENDING', 'ACCEPT', 'REJECT')
+from core.utils import STATUS_CHOICES
 
 
 class Task(TimeStampedModel):
@@ -26,16 +24,8 @@ class Task(TimeStampedModel):
     def __str__(self):
         return self.title
 
-    def accept_task(self):
-        self.request_status = STATUS_CHOICES.ACCEPT
-        self.save()
-
-    def reject_task(self):
-        self.request_status = STATUS_CHOICES.REJECT
-        self.save()
-
-    def pending_task(self):
-        self.pending_task = STATUS_CHOICES.PENDING
+    def change_task_status(self, status):
+        self.request_status = status
         self.save()
 
 
@@ -49,6 +39,9 @@ class RejectedTask(TimeStampedModel):
 
     def __str__(self):
         return f"{self.assignee.username} rejected task {self.task.id}"
+
+    class Meta:
+        unique_together = ['task', 'assignee']
 
 
 class Comment(TimeStampedModel):

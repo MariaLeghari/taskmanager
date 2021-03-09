@@ -11,6 +11,7 @@ from rest_framework.viewsets import ModelViewSet
 from rest_framework import status
 
 from core.models import User
+from core.utils import STATUS_CHOICES
 from taskmanager_api.models import Comment, EventLog, Task, RejectedTask
 from taskmanager_api.serializers import (
     CommentSerializer,
@@ -82,7 +83,7 @@ class TaskViewSet(ModelViewSet):
             if getattr(instance, '_prefetched_objects_cache', None):
                 instance._prefetched_objects_cache = {}
             EventLog(description=f"{request.user.username} updated the task.", task_id=serializer.data['id']).save()
-            return Response(serializer.data)
+            return Response(serializer.data, status=status.HTTP_200_OK)
         else:
             return Response(status=status.HTTP_401_UNAUTHORIZED)
 
@@ -96,7 +97,7 @@ class AcceptTask(APIView):
     def post(self, request, *args, **kwargs):
         task = Task.objects.filter(id=request.data.get('task')).first()
         if task and task.assignee.id == request.user.id:
-            task.accept_task()
+            task.change_task_status(STATUS_CHOICES.ACCEPT)
             EventLog(description=f"{request.user.username} accepted the task.", task_id=task.id).save()
             return Response({'data': 'successfully accepted'}, status=status.HTTP_200_OK)
         else:
@@ -123,7 +124,8 @@ class RejectTask(ListCreateAPIView):
             serializer = self.get_serializer(data=request.data)
             serializer.is_valid(raise_exception=True)
             self.perform_create(serializer)
-            task.reject_task()
+            task.change_task_status(STATUS_CHOICES.REJECT)
+
             headers = self.get_success_headers(serializer.data)
             EventLog(description=f"{request.user.username} rejected task request.", task_id=task.id).save()
             return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
@@ -184,6 +186,6 @@ class CommentViewSet(ModelViewSet):
                 # forcibly invalidate the prefetch cache on the instance.
                 instance._prefetched_objects_cache = {}
 
-            return Response(serializer.data)
+            return Response(serializer.data, status=status.HTTP_200_OK)
         else:
             return Response(status=status.HTTP_401_UNAUTHORIZED)
