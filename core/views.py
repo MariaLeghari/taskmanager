@@ -75,9 +75,9 @@ class ActivateAccount(APIView):
     permission_classes = (AllowAny,)
 
     def get(self, request, uidb64, token, *args, **kwargs):
-        uid = force_text(urlsafe_base64_decode(uidb64))
-        user = User.objects.filter(pk=uid).first()
-        if user:
+        try:
+            uid = force_text(urlsafe_base64_decode(uidb64))
+            user = User.objects.get(pk=uid)
             if not user.is_active:
                 if AccountActivationTokenGenerator().check_token(user, token):
                     user.is_active = True
@@ -88,7 +88,7 @@ class ActivateAccount(APIView):
             else:
                 return Response({'data': 'account is already activated.'}, status=status.HTTP_401_UNAUTHORIZED)
 
-        else:
+        except [User.DoesNotExist, ValueError]:
             return Response({'error': 'user does not exist.'}, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -103,14 +103,14 @@ class SendUserActivationEmail(APIView):
         email = request.data.get('email')
         if not email:
             return Response({'email': 'This field is required.'}, status=status.HTTP_400_BAD_REQUEST)
-        user = User.objects.filter(email=email).first()
-        if user:
+        try:
+            user = User.objects.get(email=email)
             if not user.is_active:
                 send_activation_email(user, request)
                 return Response({'data': 'send email'}, status=status.HTTP_200_OK)
             else:
                 return Response({'data': 'already activated'}, status=status.HTTP_401_UNAUTHORIZED)
-        else:
+        except User.DoesNotExist:
             return Response({'error': 'user does not exist'}, status=status.HTTP_400_BAD_REQUEST)
 
 

@@ -10,7 +10,9 @@ from model_utils import Choices
 
 from core.tokens import AccountActivationTokenGenerator
 
-STATUS_CHOICES = Choices('PENDING', 'ACCEPT', 'REJECT')
+REQUEST_CHOICES = Choices('PENDING', 'ACCEPT', 'REJECT')
+
+STATUS_CHOICES = Choices('UNASSIGNED', 'PENDING', 'ACCEPTED', 'REJECTED')
 
 
 def send_activation_email(user, request):

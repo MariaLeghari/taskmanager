@@ -21,6 +21,17 @@ Once `pip` has finished downloading the dependencies:
 (env)$ python manager.py runserver
 ```
 
+## Database Setup Information
+1. Download and install a [PostgreSQL](https://www.enterprisedb.com/downloads/postgres-postgresql-downloads) server in your system.
+   ``
+2. Create a new database.
+
+3. Get credentials of that database:
+   `name` , `user`, `password`, `host` and `port` .
+   
+4. Add the credentials on `.env` file.
+
+
 ## Format of Environment Variables
 Set the value of following variable in your `.env` file
 ```
@@ -35,11 +46,7 @@ SECRET_KEY =
 ```
 
 ## API Documentation and working
-You can read Task Manager Api documentation from following link:
-```
-https://app.swaggerhub.com/apis/MariaLeghari/task-manager_api/v1
-```
-or by calling `swagger/` after setup
+You can read Task Manager Api documentation  by calling `swagger/` after setup
 ```
 http://127.0.0.1:8000/swagger/
 ```

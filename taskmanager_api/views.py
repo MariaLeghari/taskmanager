@@ -4,18 +4,18 @@ Task Manager Views
 from django.db.models import Q
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.views import APIView
-from rest_framework.generics import ListCreateAPIView
+from rest_framework.generics import ListAPIView, CreateAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 from rest_framework import status
 
 from core.models import User
-from core.utils import STATUS_CHOICES
-from taskmanager_api.models import Comment, EventLog, Task, RejectedTask
+from core.utils import STATUS_CHOICES, REQUEST_CHOICES
+from taskmanager_api.models import Comment, EventLog, Task, TaskAssignees
 from taskmanager_api.serializers import (
     CommentSerializer,
-    RejectedTaskSerializer,
+    TaskAssigneesSerializer,
     TaskSerializer
 )
 
@@ -37,13 +37,17 @@ class TaskViewSet(ModelViewSet):
     model = Task
     serializer_class = TaskSerializer
     permission_classes = (IsAuthenticated,)
-    filterset_fields = ['creator', 'assignee', 'notifier', 'request_status']
+    filterset_fields = ['creator', 'notifier', 'task_status']
 
     def get_queryset(self):
-        return Task.objects.filter(
-            Q(creator=self.request.user) | Q(Q(assignee__id=self.request.user.id), ~Q(request_status='REJECT')) |
-            Q(notifier__id=self.request.user.id)
-        ).distinct()
+        if self.request.user.is_superuser:
+            return Task.objects.all()
+        else:
+            return Task.objects.filter(
+                Q(creator=self.request.user) |
+                Q(task_assignee__assignee_id=self.request.user.id,
+                  task_assignee__request_status=REQUEST_CHOICES.REJECT) |
+                Q(notifier__id=self.request.user.id)).distinct()
 
     def filter_queryset(self, queryset):
         filter_backends = (DjangoFilterBackend,)
@@ -88,49 +92,80 @@ class TaskViewSet(ModelViewSet):
             return Response(status=status.HTTP_401_UNAUTHORIZED)
 
 
-class AcceptTask(APIView):
+class TaskAssigneesList(ListAPIView):
+    """
+    get:
+    Return a list of all the rejected task by current user..
+    """
+    permission_classes = (IsAuthenticated,)
+    serializer_class = TaskAssigneesSerializer
+    filterset_fields = ['request_status']
+
+    def get_queryset(self):
+        if self.request.user.is_superuser:
+            return TaskAssignees.objects.filter()
+        return TaskAssignees.objects.filter(assignee_id=self.request.user.id)
+
+    def filter_queryset(self, queryset):
+        filter_backends = (DjangoFilterBackend,)
+        for backend in list(filter_backends):
+            queryset = backend().filter_queryset(self.request, queryset, view=self)
+        return queryset
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = TaskSerializer(self.filter_queryset(queryset), many=True, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class AcceptTask(CreateAPIView):
     """
     Change request_status to accept of the given task.
     """
     permission_classes = (IsAuthenticated,)
 
     def post(self, request, *args, **kwargs):
-        task = Task.objects.filter(id=request.data.get('task')).first()
-        if task and task.assignee.id == request.user.id:
-            task.change_task_status(STATUS_CHOICES.ACCEPT)
-            EventLog(description=f"{request.user.username} accepted the task.", task_id=task.id).save()
-            return Response({'data': 'successfully accepted'}, status=status.HTTP_200_OK)
-        else:
-            return Response(status=status.HTTP_401_UNAUTHORIZED)
+        try:
+            task_id = request.data.get('task')
+            if not task_id:
+                return Response({'task': 'This field is required.'}, status=status.HTTP_400_BAD_REQUEST)
+            task_assignee = TaskAssignees.objects.get(assignee_id=request.user.id, task_id=task_id)
+            if task_assignee.request_status != REQUEST_CHOICES.ACCEPT:
+                task_assignee.change_request_status(REQUEST_CHOICES.ACCEPT)
+                EventLog(description=f"{request.user.username} accepted the task.", task_id=task_id).save()
+                return Response({'data': 'Successfully accepted'}, status=status.HTTP_200_OK)
+            else:
+                return Response({'data': 'Already accepted'}, status=status.HTTP_401_UNAUTHORIZED)
+        except TaskAssignees.DoesNotExist:
+            return Response({'data': "Not assigned to current user or Task doesn't exist."},
+                            status=status.HTTP_400_BAD_REQUEST)
 
 
-class RejectTask(ListCreateAPIView):
+class RejectTask(CreateAPIView):
     """
-    get:
-    Return a list of all the rejected task by current user.
-
-    post:
-    Create a new reject task of the current user on a specific task and change the task request_status to reject.
+    Reject the task, assign to user
     """
     permission_classes = (IsAuthenticated,)
-    serializer_class = RejectedTaskSerializer
-
-    def get_queryset(self):
-        return RejectedTask.objects.filter(assignee__id=self.request.user.id)
 
     def post(self, request, *args, **kwargs):
-        task = Task.objects.filter(id=request.data.get('task')).first()
-        if task and request.user.id == task.assignee.id:
-            serializer = self.get_serializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            self.perform_create(serializer)
-            task.change_task_status(STATUS_CHOICES.REJECT)
-
-            headers = self.get_success_headers(serializer.data)
-            EventLog(description=f"{request.user.username} rejected task request.", task_id=task.id).save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
-        else:
-            return Response(status=status.HTTP_401_UNAUTHORIZED)
+        try:
+            task_id = request.data.get('task')
+            reason = request.data.get('reason')
+            if task_id and reason:
+                task_assignee = TaskAssignees.objects.get(assignee_id=request.user.id, task_id=task_id)
+                if task_assignee.request_status != REQUEST_CHOICES.REJECT:
+                    task_assignee.change_request_status(REQUEST_CHOICES.REJECT, reason)
+                    EventLog(description=f"{request.user.username} rejected task request.", task_id=task_id).save()
+                    return Response({'data': 'task is rejected.'}, status=status.HTTP_204_NO_CONTENT)
+                else:
+                    return Response({'data': 'This task is already rejected by the current user.'},
+                                    status=status.HTTP_401_UNAUTHORIZED)
+            else:
+                return Response({'task': 'This field is required.', 'reason': 'This field is required.'},
+                                status=status.HTTP_400_BAD_REQUEST)
+        except TaskAssignees.DoesNotExist:
+            return Response({'data': "Not assigned to current user or Task doesn't exist."},
+                            status=status.HTTP_400_BAD_REQUEST)
 
 
 class CommentViewSet(ModelViewSet):
@@ -155,17 +190,22 @@ class CommentViewSet(ModelViewSet):
         return Comment.objects.filter(task__id=self.request.data.get('task'))
 
     def create(self, request, *args, **kwargs):
-        task = Task.objects.filter(id=request.data.get('task')).first()
-        user = User.objects.filter(id=request.data.get('user')).first()
-        if task.assignee.id == user.id:
-            serializer = self.get_serializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            self.perform_create(serializer)
-            headers = self.get_success_headers(serializer.data)
-            EventLog(description=f"{request.user.username} commented on the task.", task_id=task.id).save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
-        else:
-            return Response(status=status.HTTP_401_UNAUTHORIZED)
+        try:
+            task = Task.objects.get(id=request.data.get('task'))
+            user = User.objects.get(id=request.data.get('user'))
+            if task.assignee.id == user.id:
+                serializer = self.get_serializer(data=request.data)
+                serializer.is_valid(raise_exception=True)
+                self.perform_create(serializer)
+                headers = self.get_success_headers(serializer.data)
+                EventLog(description=f"{request.user.username} commented on the task.", task_id=task.id).save()
+                return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+            else:
+                return Response({'data': 'Current user cannot update this task.'}, status=status.HTTP_401_UNAUTHORIZED)
+        except User.DoesNotExist:
+            return Response({'data': 'User does not exist.'}, status=status.HTTP_400_BAD_REQUEST)
+        except Task.DoesNotExist:
+            return Response({'data': 'Task does not exist.'}, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
